@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chat App Pandjoel</title>
+    
+    <!-- Manifest PWA agar terbaca oleh PWABuilder -->
+    <link rel="manifest" href="data:application/manifest+json;charset=utf-8,{
+        %22name%22: %22Aplikasi Chat Ku%22,
+        %22short_name%22: %22ChatKu%22,
+        %22start_url%22: %22./index.html%22,
+        %22display%22: %22standalone%22,
+        %22background_color%22: %22%23f8fafc%22,
+        %22theme_color%22: %22%236366f1%22,
+        %22icons%22: [{
+            %22src%22: %22https://img.icons8.com/fluency/96/chat.png%22,
+            %22sizes%22: %2296x96%22,
+            %22type%22: %22image/png%22
+        }]
+    }">
+
+    <!-- Firebase CDN -->
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+    
+    <style>
+        /* Menyembunyikan lencana Netlify secara otomatis */
+body > a[href*="netlify.com"], 
+div:has(> a[href*="netlify.com"]),
+.netlify-badge {
+    display: none !important;
+    visibility: hidden !important;
+    opacity: 0 !important;
+    pointer-events: none !important;
+}
+
+      :root {
+            --primary-color: #6366f1;
+            --primary-gradient: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);
+            --bg-color: #f8fafc;
+            --chat-bg: #f1f5f9;
+            --text-main: #0f172a;
+            --text-muted: #64748b;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Inter, sans-serif;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            color: var(--text-main);
+        }
+
+        header {
+            background: rgba(255, 255, 255, 0.85);
+            backdrop-filter: blur(12px);
+            border-bottom: 1px solid #e2e8f0;
+            padding: 16px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+
+        .brand-title {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .status-dot {
+            width: 10px;
+            height: 10px;
+            background-color: #10b981;
+            border-radius: 50%;
+            box-shadow: 0 0 8px #10b98180;
+        }
+
+        header h1 {
+            font-size: 17px;
+            font-weight: 700;
+        }
+
+        .btn-leave {
+            background: #fee2e2;
+            color: #ef4444;
+            border: none;
+            padding: 8px 14px;
+            border-radius: 20px;
+            font-weight: 600;
+            font-size: 13px;
+            cursor: pointer;
+        }
+
+        .hidden { display: none !important; }
+
+        #login-screen {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 24px;
+            background: radial-gradient(circle at top left, #e0e7ff 0%, #f8fafc 50%);
+        }
+
+        .login-card {
+            background: #ffffff;
+            padding: 32px 28px;
+            border-radius: 24px;
+            box-shadow: 0 20px 25px -5px rgba(0,0,0,0.05);
+            border: 1px solid #f1f5f9;
+            width: 100%;
+            max-width: 380px;
+        }
+
+        .login-card h2 {
+            font-size: 22px;
+            font-weight: 800;
+            margin-bottom: 6px;
+        }
+
+        .login-card p {
+            font-size: 13px;
+            color: var(--text-muted);
+            margin-bottom: 24px;
+        }
+
+        .input-group {
+            margin-bottom: 18px;
+        }
+
+        .input-group label {
+            display: block;
+            margin-bottom: 6px;
+            font-size: 13px;
+            color: #334155;
+            font-weight: 600;
+        }
+
+        .input-group input {
+            width: 100%;
+            padding: 12px 16px;
+            background: #f8fafc;
+            border: 1.5px solid #e2e8f0;
+            border-radius: 14px;
+            outline: none;
+            font-size: 14px;
+        }
+
+        .input-group input:focus {
+            border-color: var(--primary-color);
+            background: #fff;
+        }
+
+        .btn-primary {
+            width: 100%;
+            background: var(--primary-gradient);
+            color: white;
+            border: none;
+            padding: 14px;
+            border-radius: 14px;
+            font-weight: 700;
+            font-size: 15px;
+            cursor: pointer;
+            box-shadow: 0 10px 15px -3px #6366f140;
+        }
+
+        #chat-screen {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            max-width: 768px;
+            width: 100%;
+            margin: 0 auto;
+            background: white;
+        }
+
+        #chat-messages {
+            flex: 1;
+            padding: 20px;
+            overflow-y: auto;
+            background-color: var(--chat-bg);
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .message-row {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .message-row.me { align-items: flex-end; }
+        .message-row.other { align-items: flex-start; }
+
+        .bubble {
+            max-width: 78%;
+            padding: 10px 16px;
+            border-radius: 18px;
+            font-size: 14px;
+            line-height: 1.5;
+            word-wrap: break-word;
+        }
+
+        .message-row.me .bubble {
+            background: var(--primary-gradient);
+            color: white;
+            border-bottom-right-radius: 4px;
+        }
+
+        .message-row.other .bubble {
+            background: white;
+            color: var(--text-main);
+            border-bottom-left-radius: 4px;
+            border: 1px solid #e2e8f0;
+        }
+
+        .sender-name {
+            font-size: 11px;
+            font-weight: 700;
+            margin-bottom: 3px;
+            display: block;
+        }
+
+        .message-row.me .sender-name { color: #c7d2fe; text-align: right; }
+        .message-row.other .sender-name { color: #6366f1; }
+
+        .chat-input-area {
+            padding: 12px 16px;
+            background: white;
+            border-top: 1px solid #f1f5f9;
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .chat-input-area input {
+            flex: 1;
+            padding: 12px 18px;
+            background: #f8fafc;
+            border: 1.5px solid #e2e8f0;
+            border-radius: 24px;
+            outline: none;
+            font-size: 14px;
+        }
+
+        .chat-input-area button {
+            background: var(--primary-gradient);
+            color: white;
+            border: none;
+            width: 44px;
+            height: 44px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+        }
+
+        .chat-input-area button svg {
+            width: 18px;
+            height: 18px;
+            fill: currentColor;
+            margin-left: 2px;
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <div class="brand-title">
+            <div class="status-dot"></div>
+            <h1 id="header-title">Pandjoel Chat</h1>
+        </div>
+        <button id="leave-room" class="btn-leave hidden">Kaluar</button>
+    </header>
+
+    <div id="login-screen">
+        <div class="login-card">
+            <h2>Asup!</h2>
+            <p>Isian Nama Pengguna Jeung Room ID.</p>
+            <div class="input-group">
+                <label>Nama Pengguna</label>
+                <input type="text" id="username" placeholder="Contoh: Panjul hensem">
+            </div>
+            <div class="input-group">
+                <label>Room ID</label>
+                <input type="text" id="room-id" placeholder="Contoh: nyalse123">
+            </div>
+            <button id="join-btn" class="btn-primary">Gabung Chat</button>
+        </div>
+    </div>
+
+    <div id="chat-screen" class="hidden">
+        <div id="chat-messages"></div>
+        <div class="chat-input-area">
+            <input type="text" id="message-input" placeholder="Tulis pesan na euy...">
+            <button id="send-btn">
+                <svg viewBox="0 0 24 24">
+                    <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
+                </svg>
+            </button>
+        </div>
+    </div>
+
+    <script>
+        const firebaseConfig = {
+            databaseURL: "https://web-chat-app-default-rtdb.firebaseio.com/"
+        };
+
+        if (!firebase.apps.length) {
+            firebase.initializeApp(firebaseConfig);
+        }
+        const db = firebase.database();
+
+        let currentUser = "";
+        let currentRoom = "";
+        let chatRef = null;
+
+        const loginScreen = document.getElementById("login-screen");
+        const chatScreen = document.getElementById("chat-screen");
+        const joinBtn = document.getElementById("join-btn");
+        const usernameInput = document.getElementById("username");
+        const roomInput = document.getElementById("room-id");
+        const messageInput = document.getElementById("message-input");
+        const sendBtn = document.getElementById("send-btn");
+        const chatMessages = document.getElementById("chat-messages");
+        const leaveRoomBtn = document.getElementById("leave-room");
+        const headerTitle = document.getElementById("header-title");
+
+        joinBtn.addEventListener("click", () => {
+            const username = usernameInput.value.trim();
+            const room = roomInput.value.trim();
+
+            if (!username || !room) {
+                alert("Geus dibejaan isian nama jeung Room ID na!");
+                return;
+            }
+
+            currentUser = username;
+            currentRoom = room;
+
+            headerTitle.innerText = "Room: " + currentRoom;
+            loginScreen.classList.add("hidden");
+            chatScreen.classList.remove("hidden");
+            leaveRoomBtn.classList.remove("hidden");
+
+            chatRef = db.ref('rooms/' + currentRoom + '/messages');
+            loadMessages();
+        });
+
+        function sendMessage() {
+            const text = messageInput.value.trim();
+            if (!text) return;
+
+            const messageData = {
+                sender: currentUser,
+                text: text,
+                timestamp: Date.now()
+            };
+
+            chatRef.push(messageData);
+            messageInput.value = "";
+        }
+
+        sendBtn.addEventListener("click", sendMessage);
+        messageInput.addEventListener("keypress", (e) => {
+            if (e.key === "Enter") sendMessage();
+        });
+
+        function loadMessages() {
+            chatRef.on('child_added', /** @param {any} snapshot */ (snapshot) => {
+                const data = snapshot.val();
+                appendMessage(data);
+            });
+        }
+
+        /** @param {any} data */
+        function appendMessage(data) {
+            const isMe = data.sender === currentUser;
+            const messageRow = document.createElement("div");
+            messageRow.className = `message-row ${isMe ? 'me' : 'other'}`;
+
+            const bubble = document.createElement("div");
+            bubble.className = "bubble";
+            
+            /** @param {any} str */
+            const escapeHtml = (str) => {
+                return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+            };
+
+            bubble.innerHTML = `<span class="sender-name">${escapeHtml(data.sender)}</span>${escapeHtml(data.text)}`;
+            
+            messageRow.appendChild(bubble);
+            chatMessages.appendChild(messageRow);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+
+        leaveRoomBtn.addEventListener("click", () => {
+            location.reload();
+        });
+    </script>
+<script>
+    // Skrip otomatis untuk menghapus lencana Netlify yang muncul di layar
+    window.addEventListener('load', () => {
+        const interval = setInterval(() => {
+            const netlifyBadge = document.querySelector('a[href*="netlify.com"]');
+            if (netlifyBadge) {
+                // Cari elemen pembungkus lencana lalu hapus dari layar
+                const badgeContainer = netlifyBadge.closest('div');
+                if (badgeContainer) {
+                    badgeContainer.remove();
+                } else {
+                    netlifyBadge.remove();
+                }
+                clearInterval(interval);
+            }
+        }, 500); // Mengecek setiap setengah detik sampai lencana ketemu dan dihapus
+    });
+</script>
+
+</body>
+</html>
